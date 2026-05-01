@@ -17,15 +17,16 @@ const mockTickets: TicketType[] = DUMMY_TICKETS;
 
 export default function MyTicketsPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, hasHydrated } = useAuthStore();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace(`${PUBLIC_ROUTES.LOGIN}?redirect=${USER_ROUTES.MY_TICKETS}`);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [hasHydrated, isAuthenticated, isLoading, router]);
 
-  if (!isAuthenticated) return null;
+  if (!hasHydrated || !isAuthenticated) return null;
 
   return (
     <DashboardLayout>

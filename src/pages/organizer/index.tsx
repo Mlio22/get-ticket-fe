@@ -12,9 +12,10 @@ import { useEffect } from "react";
 
 export default function OrganizerDashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace(`${PUBLIC_ROUTES.LOGIN}?redirect=${ORGANIZER_ROUTES.DASHBOARD}`);
       return;
@@ -22,9 +23,9 @@ export default function OrganizerDashboardPage() {
     if (!isLoading && user && user.role !== "organizer" && user.role !== "admin") {
       router.replace("/dashboard");
     }
-  }, [isAuthenticated, isLoading, user, router]);
+  }, [hasHydrated, isAuthenticated, isLoading, user, router]);
 
-  if (!isAuthenticated || !user) return null;
+  if (!hasHydrated || !isAuthenticated || !user) return null;
 
   return (
     <DashboardLayout>

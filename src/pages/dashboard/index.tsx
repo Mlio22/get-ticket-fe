@@ -14,15 +14,16 @@ import { useEffect } from "react";
 
 export default function UserDashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace(`${PUBLIC_ROUTES.LOGIN}?redirect=${USER_ROUTES.DASHBOARD}`);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [hasHydrated, isAuthenticated, isLoading, router]);
 
-  if (!isAuthenticated || !user) return null;
+  if (!hasHydrated || !isAuthenticated || !user) return null;
 
   const activeTickets = DUMMY_TICKETS.filter((t) => t.status === "active");
   const upcomingEvents = new Set(DUMMY_TICKETS.filter((t) => t.status === "active").map((t) => t.event?.id)).size;

@@ -15,21 +15,22 @@ import { useEffect, useState } from "react";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
   const [name, setName] = useState(user?.name ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace(`${PUBLIC_ROUTES.LOGIN}?redirect=${USER_ROUTES.PROFILE}`);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [hasHydrated, isAuthenticated, isLoading, router]);
 
   useEffect(() => {
     if (user) setName(user.name);
   }, [user]);
 
-  if (!isAuthenticated || !user) return null;
+  if (!hasHydrated || !isAuthenticated || !user) return null;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
