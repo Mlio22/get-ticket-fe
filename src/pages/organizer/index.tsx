@@ -1,8 +1,12 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_NAME, ORGANIZER_ROUTES, PUBLIC_ROUTES } from "@/constants";
+import { ORGANIZER_DASHBOARD_DUMMY } from "@/constants/organizer-dummy-data";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { useAuthStore } from "@/stores/authStore";
+import { formatCurrency } from "@/utils/currency";
+import { formatDate } from "@/utils/timezone";
 import { ArrowRight, Calendar, PlusCircle, TrendingUp, Users } from "lucide-react";
 import type { GetServerSideProps } from "next";
 import Head from "next/head";
@@ -13,6 +17,8 @@ import { useEffect } from "react";
 export default function OrganizerDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
+  const summary = ORGANIZER_DASHBOARD_DUMMY.summary;
+  const recentEvents = ORGANIZER_DASHBOARD_DUMMY.recentEvents;
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -58,7 +64,7 @@ export default function OrganizerDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">0</p>
+              <p className="text-3xl font-bold">{summary.totalEvents}</p>
             </CardContent>
           </Card>
           <Card>
@@ -68,7 +74,7 @@ export default function OrganizerDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">0</p>
+              <p className="text-3xl font-bold">{summary.totalAttendees}</p>
             </CardContent>
           </Card>
           <Card>
@@ -78,10 +84,26 @@ export default function OrganizerDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">0</p>
+              <p className="text-3xl font-bold">{summary.ticketsSold}</p>
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Gross Revenue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-primary">
+              {formatCurrency(summary.grossRevenue, summary.currency)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Dummy payload from organizer dashboard DTO contract
+            </p>
+          </CardContent>
+        </Card>
 
         {/* My Events */}
         <div>
@@ -93,18 +115,33 @@ export default function OrganizerDashboardPage() {
               </Link>
             </Button>
           </div>
-          <div className="text-center py-12 border rounded-lg bg-muted/20">
-            <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-40" />
-            <p className="font-medium">No events yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Create your first event and start selling tickets.
-            </p>
-            <Button asChild className="mt-4" size="sm">
-              <Link href={ORGANIZER_ROUTES.CREATE_EVENT}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create Event
-              </Link>
-            </Button>
+          <div className="space-y-3">
+            {recentEvents.map((event) => {
+              const soldRate = event.totalTickets > 0
+                ? Math.round((event.soldTickets / event.totalTickets) * 100)
+                : 0;
+              return (
+                <div key={event.id} className="border rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{event.title}</h3>
+                      <Badge variant={event.status === "published" ? "default" : "secondary"} className="capitalize">
+                        {event.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {formatDate(event.startDate)} • {event.location}
+                    </p>
+                  </div>
+                  <div className="text-sm text-muted-foreground md:text-right">
+                    <p>{event.soldTickets}/{event.totalTickets} sold ({soldRate}%)</p>
+                    <p className="font-medium text-foreground">
+                      {formatCurrency(event.grossRevenue, summary.currency)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -41,6 +41,11 @@ function normalizeRole(role?: string): User["role"] {
   return "user";
 }
 
+function isTokenExpired(payload: JwtPayload | null): boolean {
+  if (!payload?.exp) return false;
+  return payload.exp * 1000 <= Date.now();
+}
+
 function extractErrorMessage(err: unknown, fallback: string): string {
   const response = (err as { response?: { data?: { message?: string; errorMessage?: string } } })
     ?.response?.data;
@@ -171,6 +176,12 @@ export const useAuthStore = create<AuthState>()(
           set({ user: data.data, isAuthenticated: true, isLoading: false });
         } catch {
           const decoded = decodeJwtPayload(token);
+          if (isTokenExpired(decoded)) {
+            tokenStorage.clear();
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
+
           const roleClaim =
             (decoded?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] as string | undefined) ||
             (decoded?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role"] as string | undefined) ||

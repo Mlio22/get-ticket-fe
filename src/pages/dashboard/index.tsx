@@ -1,7 +1,8 @@
+import { EventCard } from "@/components/EventCard";
 import { TicketCard } from "@/components/TicketCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APP_NAME, PUBLIC_ROUTES, USER_ROUTES } from "@/constants";
+import { APP_NAME, ORGANIZER_ROUTES, PUBLIC_ROUTES, USER_ROUTES } from "@/constants";
 import { DUMMY_TICKETS } from "@/constants/dummy-data";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { useAuthStore } from "@/stores/authStore";
@@ -20,13 +21,23 @@ export default function UserDashboardPage() {
     if (!hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace(`${PUBLIC_ROUTES.LOGIN}?redirect=${USER_ROUTES.DASHBOARD}`);
+      return;
     }
-  }, [hasHydrated, isAuthenticated, isLoading, router]);
+    if (!isLoading && user?.role === "organizer") {
+      router.replace(ORGANIZER_ROUTES.DASHBOARD);
+    }
+  }, [hasHydrated, isAuthenticated, isLoading, router, user]);
 
-  if (!hasHydrated || !isAuthenticated || !user) return null;
+  if (!hasHydrated || !isAuthenticated || !user || user.role === "organizer") return null;
 
   const activeTickets = DUMMY_TICKETS.filter((t) => t.status === "active");
-  const upcomingEvents = new Set(DUMMY_TICKETS.filter((t) => t.status === "active").map((t) => t.event?.id)).size;
+  const upcomingEventsList = activeTickets
+    .filter((t) => t.event !== undefined)
+    .reduce<typeof activeTickets>((acc, ticket) => {
+      if (!acc.find((t) => t.event?.id === ticket.event?.id)) acc.push(ticket);
+      return acc;
+    }, []);
+  const upcomingEventsCount = upcomingEventsList.length;
 
   return (
     <DashboardLayout>
@@ -71,7 +82,7 @@ export default function UserDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{upcomingEvents}</p>
+              <p className="text-3xl font-bold">{upcomingEventsCount}</p>
             </CardContent>
           </Card>
         </div>
@@ -98,6 +109,36 @@ export default function UserDashboardPage() {
               <p className="font-medium">No tickets yet</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Browse events and grab your first ticket!
+              </p>
+              <Button asChild className="mt-4" size="sm">
+                <Link href={PUBLIC_ROUTES.EVENTS}>Browse Events</Link>
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming Events */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Upcoming Events</h2>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={PUBLIC_ROUTES.EVENTS}>
+                Browse more <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          {upcomingEventsList.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {upcomingEventsList.map(({ event }) =>
+                event ? <EventCard key={event.id} event={event} /> : null
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12 border rounded-lg bg-muted/20">
+              <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+              <p className="font-medium">No upcoming events</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Your active ticket events will appear here.
               </p>
               <Button asChild className="mt-4" size="sm">
                 <Link href={PUBLIC_ROUTES.EVENTS}>Browse Events</Link>

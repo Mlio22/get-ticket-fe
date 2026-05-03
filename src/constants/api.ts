@@ -21,6 +21,7 @@ export const AUTH_ENDPOINTS = {
 // Event endpoints — routes match EventController: api/[controller] = api/event
 export const EVENT_ENDPOINTS = {
   LIST: "/event",
+  MINE: "/event/mine",
   DETAIL: (id: string) => `/event/${id}`,
   CREATE: "/event",
   UPDATE: (id: string) => `/event/${id}`,
@@ -37,8 +38,8 @@ export const TICKET_TYPE_ENDPOINTS = {
 
 // Ticket endpoints
 export const TICKET_ENDPOINTS = {
-  MY_TICKETS: "/tickets/me",
-  DETAIL: (id: string) => `/tickets/${id}`,
+  MY_TICKETS: "/checkout/me/tickets",
+  DETAIL: (id: string) => `/checkout/tickets/${id}`,
 } as const;
 
 // Order endpoints
@@ -47,4 +48,10 @@ export const ORDER_ENDPOINTS = {
   LIST: "/orders/me",
   DETAIL: (id: string) => `/orders/${id}`,
   CANCEL: (id: string) => `/orders/${id}/cancel`,
+} as const;
+
+// Invoice / payment endpoints
+export const INVOICE_ENDPOINTS = {
+  CREATE: "/checkout",
+  DETAIL: (id: string) => `/checkout/${id}`,
 } as const;

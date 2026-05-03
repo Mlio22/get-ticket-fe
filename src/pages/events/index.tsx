@@ -2,48 +2,83 @@ import { EventCard } from "@/components/EventCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { APP_NAME, DEFAULT_PAGE_SIZE, EVENT_CATEGORIES } from "@/constants";
+import { APP_NAME, DEFAULT_PAGE_SIZE, EVENT_CATEGORIES, PUBLIC_ROUTES } from "@/constants";
 import { MainLayout } from "@/layouts/MainLayout";
+import { useAuthStore } from "@/stores/authStore";
 import { useEventStore } from "@/stores/eventStore";
-import type { EventCategory } from "@/types";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Search, X } from "lucide-react";
 import type { GetServerSideProps } from "next";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function EventsPage() {
   const router = useRouter();
-  const { events, total, totalPages, page, isLoading, fetchEvents } =
-    useEventStore();
+  const { user, isAuthenticated, hasHydrated } = useAuthStore();
+  const { events, isLoading, error, total, page, totalPages, fetchEvents } = useEventStore();
 
-  const [search, setSearch] = useState((router.query.search as string) || "");
-  const selectedCategory = router.query.category as EventCategory | undefined;
+  const [search, setSearch] = useState((router.query.search as string) ?? "");
+  const [activeCategory, setActiveCategory] = useState((router.query.category as string) ?? "");
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch events from the real API when filters/query change
   useEffect(() => {
+    if (!hasHydrated) return;
+    if (isAuthenticated && user?.role === "organizer") {
+      router.replace("/organizer/events");
+    }
+  }, [hasHydrated, isAuthenticated, user, router]);
+
+  // Sync filters from URL on mount and when query changes
+  useEffect(() => {
+    const category = (router.query.category as string) ?? "";
+    const searchQ = (router.query.search as string) ?? "";
+    const pageQ = Number(router.query.page) || 1;
+
+    setActiveCategory(category);
+    setSearch(searchQ);
+
     fetchEvents({
-      search: (router.query.search as string) || undefined,
-      category: router.query.category as EventCategory | undefined,
-      page: router.query.page ? Number(router.query.page) : 1,
+      page: pageQ,
+      limit: DEFAULT_PAGE_SIZE,
+      ...(category ? { category } : {}),
+      ...(searchQ ? { search: searchQ } : {}),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.query]);
+  }, [router.query.category, router.query.search, router.query.page]);
 
-  const updateQuery = (params: Record<string, string | number | undefined>) => {
-    const query = { ...router.query, ...params };
-    // Remove undefined keys
-    Object.keys(query).forEach((k) => query[k] === undefined && delete query[k]);
-    router.push({ pathname: router.pathname, query }, undefined, { shallow: true });
+  const updateQuery = (updates: Record<string, string | number | undefined>) => {
+    const merged = {
+      ...router.query,
+      page: 1,
+      ...updates,
+    };
+    // Remove empty values
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(merged)) {
+      if (v !== undefined && v !== "" && v !== null) {
+        cleaned[k] = String(v);
+      }
+    }
+    router.push({ pathname: PUBLIC_ROUTES.EVENTS, query: cleaned }, undefined, { shallow: true });
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateQuery({ search: search || undefined, page: 1 });
+  const handleCategoryClick = (cat: string) => {
+    const next = activeCategory === cat ? "" : cat;
+    setActiveCategory(next);
+    updateQuery({ category: next || undefined });
   };
 
-  const handleCategorySelect = (cat: EventCategory | undefined) => {
-    updateQuery({ category: cat, page: 1 });
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      updateQuery({ search: value || undefined });
+    }, 400);
+  };
+
+  const handleClearSearch = () => {
+    setSearch("");
+    updateQuery({ search: undefined });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -51,144 +86,118 @@ export default function EventsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const clearFilters = () => {
-    setSearch("");
-    router.push({ pathname: router.pathname }, undefined, { shallow: true });
-  };
-
-  const hasActiveFilters = !!router.query.search || !!router.query.category;
-
   return (
     <MainLayout>
       <Head>
-        <title>Events – {APP_NAME}</title>
-        <meta name="description" content="Browse all available events." />
+        <title>Browse Events – {APP_NAME}</title>
+        <meta
+          name="description"
+          content="Discover concerts, sports, tech conferences, food festivals, and more."
+        />
       </Head>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Page header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-1">Events</h1>
-          <p className="text-muted-foreground">
-            {total > 0 ? `${total.toLocaleString()} events found` : "Discover upcoming events"}
+      <div className="container mx-auto px-4 py-10 space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Browse Events</h1>
+          <p className="text-muted-foreground mt-1">
+            {total > 0 ? `${total} event${total !== 1 ? "s" : ""} found` : "Discover events near you"}
           </p>
         </div>
 
-        {/* Search + filters */}
-        <div className="space-y-4 mb-8">
-          <form onSubmit={handleSearch} className="flex gap-2 max-w-xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search events…"
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button type="submit" variant="secondary">
-              Search
-            </Button>
-            {hasActiveFilters && (
-              <Button type="button" variant="ghost" size="icon" onClick={clearFilters}>
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </form>
-
-          {/* Category filter */}
-          <div className="flex flex-wrap gap-2 items-center">
-            <SlidersHorizontal className="h-4 w-4 text-muted-foreground shrink-0" />
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search events…"
+            className="pl-9 pr-9"
+          />
+          {search && (
             <button
-              onClick={() => handleCategorySelect(undefined)}
-              className={`rounded-full px-3 py-1 text-sm border transition-colors ${!selectedCategory
-                ? "bg-primary text-primary-foreground border-primary"
-                : "hover:bg-accent"
-                }`}
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              All
+              <X className="h-4 w-4" />
             </button>
-            {EVENT_CATEGORIES.map((cat) => (
-              <button
-                key={cat.value}
-                onClick={() => handleCategorySelect(cat.value as EventCategory)}
-                className={`rounded-full px-3 py-1 text-sm border transition-colors ${selectedCategory === cat.value
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "hover:bg-accent"
-                  }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Active filter badges */}
-          {hasActiveFilters && (
-            <div className="flex gap-2 flex-wrap">
-              {router.query.search && (
-                <Badge variant="secondary">
-                  Search: "{router.query.search}"
-                  <button
-                    onClick={() => updateQuery({ search: undefined, page: 1 })}
-                    className="ml-1.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {selectedCategory && (
-                <Badge variant="secondary">
-                  {EVENT_CATEGORIES.find((c) => c.value === selectedCategory)?.label}
-                  <button
-                    onClick={() => handleCategorySelect(undefined)}
-                    className="ml-1.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-            </div>
           )}
         </div>
 
-        {/* Grid */}
+        {/* Category filters */}
+        <div className="flex flex-wrap gap-2">
+          <Badge
+            variant={activeCategory === "" ? "default" : "outline"}
+            className="cursor-pointer px-3 py-1 text-sm"
+            onClick={() => handleCategoryClick("")}
+          >
+            All
+          </Badge>
+          {EVENT_CATEGORIES.map((cat) => (
+            <Badge
+              key={cat.value}
+              variant={activeCategory === cat.value ? "default" : "outline"}
+              className="cursor-pointer px-3 py-1 text-sm"
+              onClick={() => handleCategoryClick(cat.value)}
+            >
+              {cat.label}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Events grid */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {Array.from({ length: DEFAULT_PAGE_SIZE }).map((_, i) => (
-              <div key={i} className="h-72 rounded-lg bg-muted animate-pulse" />
-            ))}
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : events.length > 0 ? (
+        ) : error ? (
+          <div className="text-center py-24 text-destructive">
+            <p className="font-medium">{error}</p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => fetchEvents({ page: 1, limit: DEFAULT_PAGE_SIZE })}
+            >
+                Try again
+              </Button>
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-24 text-muted-foreground">
+              <p className="font-medium text-lg">No events found</p>
+              <p className="text-sm mt-1">Try adjusting your search or category filter.</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => {
+                  setSearch("");
+                  setActiveCategory("");
+                  router.push(PUBLIC_ROUTES.EVENTS);
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+            ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {events.map((event) => (
               <EventCard key={event.id} event={event} />
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 text-muted-foreground">
-            <Search className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No events found</p>
-            <p className="text-sm mt-1">Try a different search or category</p>
-            {hasActiveFilters && (
-              <Button variant="link" className="mt-2" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            )}
-          </div>
+                </div>
         )}
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-10">
+          <div className="flex items-center justify-center gap-2 pt-4">
             <Button
               variant="outline"
               size="sm"
               disabled={page <= 1}
               onClick={() => handlePageChange(page - 1)}
             >
-              Previous
+              <ChevronLeft className="h-4 w-4" />
+              Prev
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground px-2">
               Page {page} of {totalPages}
             </span>
             <Button
@@ -198,6 +207,7 @@ export default function EventsPage() {
               onClick={() => handlePageChange(page + 1)}
             >
               Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         )}

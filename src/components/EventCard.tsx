@@ -11,9 +11,10 @@ import Link from "next/link";
 
 interface EventCardProps {
   event: Event;
+  showTicketAction?: boolean;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, showTicketAction = true }: EventCardProps) {
   const categoryLabel =
     EVENT_CATEGORIES.find((c) => c.value === event.category)?.label ?? event.category;
 
@@ -81,11 +82,13 @@ export function EventCard({ event }: EventCardProps) {
 
       <CardFooter className="flex items-center justify-between border-t pt-3 pb-4">
         <span className="font-semibold text-primary">{priceDisplay}</span>
-        <Button size="sm" asChild disabled={event.status === "cancelled"}>
-          <Link href={PUBLIC_ROUTES.EVENT_DETAIL(event.id)}>
-            {event.status === "cancelled" ? "Cancelled" : "Get Tickets"}
-          </Link>
-        </Button>
+        {showTicketAction ? (
+          <Button size="sm" asChild disabled={event.status === "cancelled"}>
+            <Link href={PUBLIC_ROUTES.EVENT_DETAIL(event.id)}>
+              {event.status === "cancelled" ? "Cancelled" : "Get Tickets"}
+            </Link>
+          </Button>
+        ) : null}
       </CardFooter>
     </Card>
   );

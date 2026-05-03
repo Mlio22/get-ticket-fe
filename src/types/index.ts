@@ -54,7 +54,7 @@ export type EventCategory =
   | "education"
   | "other";
 
-export type EventStatus = "draft" | "published" | "ongoing" | "cancelled" | "completed";
+export type EventStatus = "draft" | "upcoming" | "published" | "ongoing" | "cancelled" | "completed";
 
 export interface Event {
   id: string;
@@ -171,4 +171,94 @@ export interface EventFilters {
   endDate?: string;
   page?: number;
   limit?: number;
+}
+
+// ─── Organizer Dashboard DTOs ────────────────────────────────────────────────
+
+export interface OrganizerDashboardSummaryDto {
+  totalEvents: number;
+  totalAttendees: number;
+  ticketsSold: number;
+  grossRevenue: number;
+  currency: string;
+}
+
+export interface OrganizerDashboardEventDto {
+  id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  location: string;
+  status: EventStatus;
+  totalTickets: number;
+  soldTickets: number;
+  grossRevenue: number;
+}
+
+export interface OrganizerDashboardDto {
+  summary: OrganizerDashboardSummaryDto;
+  recentEvents: OrganizerDashboardEventDto[];
+}
+
+// ─── Organizer Event Write DTOs ─────────────────────────────────────────────
+
+export interface UpsertEventTicketDto {
+  id?: string;
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  totalSeats: number;
+  availableSeats?: number;
+  saleStartDate?: string;
+  saleEndDate?: string;
+  status?: string;
+}
+
+export interface UpsertEventDto {
+  title: string;
+  description: string;
+  category: EventCategory;
+  location: string;
+  address?: string;
+  startDate: string;
+  endDate: string;
+  timezone?: string;
+  posterImage?: string;
+  bannerImage?: string;
+  status?: EventStatus;
+}
+
+export interface UpsertEventWithTicketsRequestDto {
+  event: UpsertEventDto;
+  ticketTypes: UpsertEventTicketDto[];
+}
+
+// ─── Checkout / Invoice ───────────────────────────────────────────────────────
+
+export interface CheckoutItem {
+  ticketTypeId: string;
+  name: string;
+  price: number;
+  currency: string;
+  quantity: number;
+}
+
+export interface CreateInvoiceRequestDto {
+  eventId: string;
+  items: { ticketTypeId: string; quantity: number }[];
+  successRedirectUrl?: string;
+  failureRedirectUrl?: string;
+}
+
+export interface InvoiceResponse {
+  id: string;
+  orderId?: string;
+  externalId?: string;
+  invoiceUrl: string;
+  status: string;
+  amount: number;
+  currency: string;
+  expiryDate?: string;
+  payerEmail?: string;
 }

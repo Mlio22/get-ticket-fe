@@ -1,4 +1,4 @@
-import { API_BASE_URL, AUTH_ENDPOINTS, EVENT_API_BASE_URL } from "@/constants/api";
+import { API_BASE_URL, EVENT_API_BASE_URL } from "@/constants/api";
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 const TOKEN_KEY = "access_token";
@@ -51,80 +51,28 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ─── Response interceptor – handle 401 / token refresh ───────────────────────
+// ─── Response interceptor – handle 401 ───────────────────────────────────────
 
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}> = [];
+const isAuthPage = (pathname: string) => pathname.startsWith("/login") || pathname.startsWith("/register");
 
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else if (token) {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
+const redirectToLogin = () => {
+  if (typeof window === "undefined") return;
+  if (isAuthPage(window.location.pathname)) return;
+  const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+  window.location.href = `/login?redirect=${redirect}`;
+};
+
+const handleUnauthorized = () => {
+  tokenStorage.clear();
+  redirectToLogin();
 };
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      const refreshToken = tokenStorage.getRefreshToken();
-
-      if (!refreshToken) {
-        tokenStorage.clear();
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
-        return Promise.reject(error);
-      }
-
-      if (isRefreshing) {
-        return new Promise<string>((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const { data } = await axios.post(
-          `${API_BASE_URL}${AUTH_ENDPOINTS.REFRESH}`,
-          { refreshToken }
-        );
-        const newAccessToken: string = data.data.accessToken;
-        tokenStorage.setToken(newAccessToken);
-        apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
-        processQueue(null, newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        tokenStorage.clear();
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      handleUnauthorized();
     }
-
     return Promise.reject(error);
   }
 );
@@ -148,4 +96,14 @@ eventApiClient.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+eventApiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      handleUnauthorized();
+    }
+    return Promise.reject(error);
+  }
 );
