@@ -6,6 +6,7 @@ import { APP_NAME, DEFAULT_PAGE_SIZE, EVENT_CATEGORIES, PUBLIC_ROUTES } from "@/
 import { MainLayout } from "@/layouts/MainLayout";
 import { useAuthStore } from "@/stores/authStore";
 import { useEventStore } from "@/stores/eventStore";
+import type { EventCategory } from "@/types";
 import { ChevronLeft, ChevronRight, Loader2, Search, X } from "lucide-react";
 import type { GetServerSideProps } from "next";
 import Head from "next/head";
@@ -20,6 +21,7 @@ export default function EventsPage() {
   const [search, setSearch] = useState((router.query.search as string) ?? "");
   const [activeCategory, setActiveCategory] = useState((router.query.category as string) ?? "");
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validCategories = new Set<string>(EVENT_CATEGORIES.map((c) => c.value));
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -30,11 +32,12 @@ export default function EventsPage() {
 
   // Sync filters from URL on mount and when query changes
   useEffect(() => {
-    const category = (router.query.category as string) ?? "";
+    const rawCategory = (router.query.category as string) ?? "";
+    const category = validCategories.has(rawCategory) ? (rawCategory as EventCategory) : undefined;
     const searchQ = (router.query.search as string) ?? "";
     const pageQ = Number(router.query.page) || 1;
 
-    setActiveCategory(category);
+    setActiveCategory(category ?? "");
     setSearch(searchQ);
 
     fetchEvents({
@@ -55,7 +58,7 @@ export default function EventsPage() {
     // Remove empty values
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(merged)) {
-      if (v !== undefined && v !== "" && v !== null) {
+      if (v !== undefined && v !== null) {
         cleaned[k] = String(v);
       }
     }
