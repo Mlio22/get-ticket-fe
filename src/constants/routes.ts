@@ -11,7 +11,9 @@ export const PUBLIC_ROUTES = {
 export const USER_ROUTES = {
   DASHBOARD: "/dashboard",
   MY_TICKETS: "/dashboard/tickets",
+  MY_TICKET_DETAIL: (eventId: string) => `/dashboard/tickets/${eventId}`,
   MY_ORDERS: "/dashboard/orders",
+  MY_ORDER_DETAIL: (orderId: string) => `/dashboard/orders/${orderId}`,
   PROFILE: "/dashboard/profile",
 } as const;
 

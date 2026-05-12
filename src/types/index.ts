@@ -103,7 +103,7 @@ export interface Ticket {
   orderId: string;
   event?: Event;
   qrCode?: string;
-  status: "active" | "used" | "cancelled" | "refunded";
+  status: "active" | "used" | "expired" | "cancelled" | "refunded";
   purchasedAt: string;
 }
 
@@ -198,6 +198,18 @@ export interface OrganizerDashboardEventDto {
 export interface OrganizerDashboardDto {
   summary: OrganizerDashboardSummaryDto;
   recentEvents: OrganizerDashboardEventDto[];
+}
+
+export interface AttendeeDashboardSummaryDto {
+  activeTickets: number;
+  totalOrders: number;
+  upcomingEvents: number;
+}
+
+export interface AttendeeDashboardDto {
+  summary: AttendeeDashboardSummaryDto;
+  recentTickets: Ticket[];
+  upcomingEvents: Event[];
 }
 
 // ─── Organizer Event Write DTOs ─────────────────────────────────────────────

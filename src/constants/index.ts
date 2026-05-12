@@ -34,6 +34,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
 export const TICKET_STATUS_LABELS: Record<string, string> = {
   active: "Active",
   used: "Used",
+  expired: "Expired",
   cancelled: "Cancelled",
   refunded: "Refunded",
 };

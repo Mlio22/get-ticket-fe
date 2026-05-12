@@ -38,16 +38,23 @@ export const TICKET_TYPE_ENDPOINTS = {
 
 // Ticket endpoints
 export const TICKET_ENDPOINTS = {
-  MY_TICKETS: "/checkout/me/tickets",
-  DETAIL: (id: string) => `/checkout/tickets/${id}`,
+  MY_TICKETS: "/tickets/me",
+  BY_EVENT: (eventId: string) => `/tickets/me/event/${eventId}`,
+  DETAIL: (id: string) => `/tickets/${id}`,
+  MARK_USED: (id: string) => `/tickets/${id}/use`,
 } as const;
 
 // Order endpoints
 export const ORDER_ENDPOINTS = {
   CREATE: "/orders",
   LIST: "/orders/me",
-  DETAIL: (id: string) => `/orders/${id}`,
+  DETAIL: (id: string) => `/orders/me/${id}`,
   CANCEL: (id: string) => `/orders/${id}/cancel`,
+} as const;
+
+export const DASHBOARD_ENDPOINTS = {
+  ATTENDEE: "/dashboard/attendee",
+  ORGANIZER: "/dashboard/organizer",
 } as const;
 
 // Invoice / payment endpoints

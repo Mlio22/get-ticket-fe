@@ -2,20 +2,46 @@ import { EventCard } from "@/components/EventCard";
 import { TicketCard } from "@/components/TicketCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { APP_NAME, ORGANIZER_ROUTES, PUBLIC_ROUTES, USER_ROUTES } from "@/constants";
-import { DUMMY_TICKETS } from "@/constants/dummy-data";
+import { APP_NAME, DASHBOARD_ENDPOINTS, ORGANIZER_ROUTES, PUBLIC_ROUTES, USER_ROUTES } from "@/constants";
 import { DashboardLayout } from "@/layouts/DashboardLayout";
 import { useAuthStore } from "@/stores/authStore";
-import { ArrowRight, Calendar, ShoppingBag, Ticket } from "lucide-react";
+import type { AttendeeDashboardDto, DataResponse } from "@/types";
+import { eventApiClient } from "@/utils/axios";
+import { ArrowRight, Calendar, Loader2, RefreshCcw, ShoppingBag, Ticket } from "lucide-react";
 import type { GetServerSideProps } from "next";
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function UserDashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading, hasHydrated } = useAuthStore();
+  const [dashboard, setDashboard] = useState<AttendeeDashboardDto | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboard = useCallback(async () => {
+    setIsFetching(true);
+    setError(null);
+
+    try {
+      const { data } = await eventApiClient.get<DataResponse<AttendeeDashboardDto>>(
+        DASHBOARD_ENDPOINTS.ATTENDEE
+      );
+      setDashboard(data.data);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { errorMessage?: string; message?: string } } })?.response?.data
+          ?.errorMessage ||
+        (err as { response?: { data?: { errorMessage?: string; message?: string } } })?.response?.data
+          ?.message ||
+        "Failed to load dashboard.";
+      setError(message);
+    } finally {
+      setIsFetching(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -25,19 +51,17 @@ export default function UserDashboardPage() {
     }
     if (!isLoading && user?.role === "organizer") {
       router.replace(ORGANIZER_ROUTES.DASHBOARD);
+      return;
     }
-  }, [hasHydrated, isAuthenticated, isLoading, router, user]);
+
+    fetchDashboard();
+  }, [fetchDashboard, hasHydrated, isAuthenticated, isLoading, router, user]);
 
   if (!hasHydrated || !isAuthenticated || !user || user.role === "organizer") return null;
 
-  const activeTickets = DUMMY_TICKETS.filter((t) => t.status === "active");
-  const upcomingEventsList = activeTickets
-    .filter((t) => t.event !== undefined)
-    .reduce<typeof activeTickets>((acc, ticket) => {
-      if (!acc.find((t) => t.event?.id === ticket.event?.id)) acc.push(ticket);
-      return acc;
-    }, []);
-  const upcomingEventsCount = upcomingEventsList.length;
+  const summary = dashboard?.summary;
+  const recentTickets = dashboard?.recentTickets ?? [];
+  const upcomingEventsList = dashboard?.upcomingEvents ?? [];
 
   return (
     <DashboardLayout>
@@ -46,12 +70,34 @@ export default function UserDashboardPage() {
       </Head>
 
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Welcome back, {user.name.split(" ")[0]}!</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Here&apos;s a summary of your account.
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold">Welcome back, {user.name.split(" ")[0]}!</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Here&apos;s a summary of your account.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchDashboard} disabled={isFetching}>
+            <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
         </div>
+
+        {error ? (
+          <div className="text-center py-10 border rounded-lg bg-muted/20">
+            <Ticket className="h-10 w-10 mx-auto mb-3 text-destructive opacity-80" />
+            <p className="font-medium">Could not load dashboard</p>
+            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+            <Button onClick={fetchDashboard} className="mt-4" size="sm" variant="outline">
+              Try Again
+            </Button>
+          </div>
+        ) : null}
+
+        {isFetching && !dashboard ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : null}
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -62,7 +108,7 @@ export default function UserDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{activeTickets.length}</p>
+              <p className="text-3xl font-bold">{summary?.activeTickets ?? 0}</p>
             </CardContent>
           </Card>
           <Card>
@@ -72,7 +118,7 @@ export default function UserDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{DUMMY_TICKETS.length}</p>
+              <p className="text-3xl font-bold">{summary?.totalOrders ?? 0}</p>
             </CardContent>
           </Card>
           <Card>
@@ -82,7 +128,7 @@ export default function UserDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{upcomingEventsCount}</p>
+              <p className="text-3xl font-bold">{summary?.upcomingEvents ?? 0}</p>
             </CardContent>
           </Card>
         </div>
@@ -97,9 +143,9 @@ export default function UserDashboardPage() {
               </Link>
             </Button>
           </div>
-          {DUMMY_TICKETS.length > 0 ? (
+          {recentTickets.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {DUMMY_TICKETS.slice(0, 4).map((ticket) => (
+              {recentTickets.map((ticket) => (
                 <TicketCard key={ticket.id} ticket={ticket} />
               ))}
             </div>
@@ -129,9 +175,7 @@ export default function UserDashboardPage() {
           </div>
           {upcomingEventsList.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {upcomingEventsList.map(({ event }) =>
-                event ? <EventCard key={event.id} event={event} /> : null
-              )}
+              {upcomingEventsList.map((event) => <EventCard key={event.id} event={event} />)}
             </div>
           ) : (
             <div className="text-center py-12 border rounded-lg bg-muted/20">
